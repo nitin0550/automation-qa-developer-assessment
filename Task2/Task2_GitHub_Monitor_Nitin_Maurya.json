@@ -1,0 +1,314 @@
+{
+  "name": "GitHub Top 5 Repository Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -800,
+        -32
+      ],
+      "id": "bbecd36e-dee9-4736-b52e-f36460d1d4ab",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/search/repositories",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "language:python"
+            },
+            {
+              "name": "sort",
+              "value": "stars"
+            },
+            {
+              "name": "order",
+              "value": "desc"
+            },
+            {
+              "name": "per_page",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -528,
+        -32
+      ],
+      "id": "e36abbaa-31c8-4eb5-8671-95d577165a9b",
+      "name": "HTTP Request",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const repositories = $json.items || [];\n\nreturn repositories\n  .sort((a, b) => b.stargazers_count - a.stargazers_count)\n  .slice(0, 5)\n  .map(repo => ({\n    json: {\n      name: repo.name,\n      full_name: repo.full_name,\n      owner: repo.owner.login,\n      stars: repo.stargazers_count,\n      description: repo.description,\n      url: repo.html_url\n    }\n  }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        -32
+      ],
+      "id": "4ed6efdc-aa4e-4fc5-9a31-10a8fd1ebcd5",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{$json.full_name}}/readme",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -112,
+        -32
+      ],
+      "id": "2f27a6de-fdeb-4ccf-b40d-6256a9c4173d",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const readmes = $input.all();\nconst repositories = $('Code in JavaScript').all();\n\nreturn readmes.map((item, index) => {\n  const repo = repositories[index].json;\n\n  return {\n    json: {\n      ...repo,\n      readme_name: item.json.name,\n      readme_path: item.json.path,\n      readme_url: item.json.html_url,\n      readme_size: item.json.size\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        -32
+      ],
+      "id": "d2240975-43be-4f8c-b36e-2bf252b9ea79",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ae3cb0f0-5c4a-43d7-b824-e8f79cc5226a",
+              "leftValue": "={{$json.stars}}",
+              "rightValue": 10000,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        288,
+        -32
+      ],
+      "id": "64011471-c9a3-4a22-b71d-fb3acfed2474",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "8191750571",
+        "text": "={{$json.message}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        16,
+        160
+      ],
+      "id": "a05ce403-329f-4db6-a054-a1bff5052670",
+      "name": "Send a text message",
+      "webhookId": "254a5019-ab18-4479-8b6f-79def5bf8ce6",
+      "credentials": {
+        "telegramApi": {
+          "id": "jWzPMrrXIvyipBQe",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const repos = $input.all();\n\nconst lines = repos.map((item, index) => {\n  const r = item.json;\n\n  return `${index + 1}. ${r.full_name}\n⭐ ${r.stars.toLocaleString()} stars\n🔗 ${r.url}`;\n});\n\nreturn [\n  {\n    json: {\n      message: `🚀 GitHub Top 5 Python Repositories\n\n${lines.join('\\n\\n')}`\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        -32
+      ],
+      "id": "bacafdb7-8c6b-4060-9450-073aa29f6382",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      message: `⚠️ GitHub API Error\n\nThe GitHub API request failed.\nPlease check the workflow execution and API availability.`\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        192
+      ],
+      "id": "83eb88d6-2b04-49ab-b8ae-57c7667e93ef",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "chatId": "8191750571",
+        "text": "={{$json.message}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -432,
+        192
+      ],
+      "id": "cfb55cf6-7d4d-45db-9da5-430fa21da8dd",
+      "name": "Send a text message1",
+      "webhookId": "e29b8d47-e587-4dfe-a10a-6cb2ce3c1a8c",
+      "credentials": {
+        "telegramApi": {
+          "id": "jWzPMrrXIvyipBQe",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4c622837-87b6-4ea0-be14-a6aa19c759e1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c8042b2c768ecab6e5cfe4eb1a1d11732a77088101d034149fb3409769864ef3"
+  },
+  "nodeGroups": [],
+  "id": "QboUlGKIowchAyke",
+  "tags": []
+}
